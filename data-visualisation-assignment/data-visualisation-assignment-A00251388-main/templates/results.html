@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>Tweet Sentiment App</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+    	<script src="https://code.jquery.com/jquery-3.1.1.min.js" crossorigin="anonymous"></script>
+
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    	<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js" integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa" crossorigin="anonymous"></script>
+	<link href="https://maxcdn.bootstrapcdn.com/bootswatch/3.3.7/paper/bootstrap.min.css" rel="stylesheet" integrity="sha384-awusxf8AUojygHf2+joICySzB780jVvQaVCAt1clU3QsyAitLGul28Qxb2r1e5g+" crossorigin="anonymous">
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.16.0/umd/popper.min.js"></script>
+  <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+    <script src="https://code.highcharts.com/highcharts.js"></script>
+    <script src="https://code.highcharts.com/modules/data.js"></script>
+    <script src="https://code.highcharts.com/modules/drilldown.js"></script>
+    <script src="https://code.highcharts.com/modules/exporting.js"></script>
+    <script src="https://code.highcharts.com/modules/export-data.js"></script>
+    <script src="https://code.highcharts.com/modules/accessibility.js"></script>
+  <style>
+  .fakeimg {
+    height: 200px;
+    background: #aaa;
+  }
+
+  </style>
+</head>
+<body>
+
+<nav class="navbar navbar-expand-sm bg-dark navbar-dark">
+  <a class="navbar-brand" href="#">Tweet Sentiment</a>
+  <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#collapsibleNavbar">
+    <span class="navbar-toggler-icon"></span>
+  </button>
+  <div class="collapse navbar-collapse" id="collapsibleNavbar">
+    <ul class="navbar-nav">
+      <li class="nav-item">
+        <a class="nav-link" href="/api">Textblob vs Vader</a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link" href="/">Live topic breakdown</a>
+      </li>
+    </ul>
+  </div>
+</nav>
+<div class='container-fluid'>
+
+    <div class="jumbotron jumbotron-fluid bg-secondary">
+  <div class='text-center'>
+			<h1 class ="text-white">Live Topic Breakdown</h1>
+			<div id="search_box" class="container-fluid">
+				<div><input class ="text-black" type="text" id="query">
+                <input type="text" id="2query"></div>
+                <br>
+                <div>
+                <button id="search" type="button" class="btn btn-dark">Search</button>
+				<button class="btn btn-dark" id="csv">Download CSV</button>
+                    </div>
+				<div class ="text-white display-3" id="loading">Loading...</div>
+				<div  id="container" style="min-width: 310px; height: 400px; max-width: 1000px; margin: 0 auto"></div>
+			</div>
+		</div>
+</div>
+</div>
+        <div class="row">
+		<div class="col-xs-6" id="tweets"></div>
+            <div class="col-xs-6" id="tweets2"></div>
+            </div>
+<script type="text/javascript">
+	 var dataone;
+	 var datatwo;
+		function sentimentcolor(sentiment){
+			if(sentiment == 'positive') return 'panel-success';
+			else if(sentiment == 'negative') return 'panel-danger';
+			else return 'panel-primary';
+		}
+
+		function load_tweets(querystring,querystrings){
+			$.ajax({
+			    url: 'tweets',
+			    data: {'query': querystring,'2query': querystrings},
+			    dataType: 'json',
+			    type: 'GET',
+			    success: function(data) {
+			    	buildChart(data);
+			    	dataone = data['data'];
+			    	datatwo = data['sdata'];
+			        var tweets = data['data'];
+			        var secondset = data['sdata'];
+			        var container = $('#tweets');
+			        var container2 = $('#tweets2');
+			        var contents = '';
+			        var contents2 = '';
+			        contents+='<div>'
+			        for(i = 0; i < tweets.length; i++){
+			        	contents+= '<div class="panel '+ sentimentcolor(tweets[i].sentiment) +'"> <div class="panel-heading"> <h3 class="panel-title">'+ tweets[i].user +'</h3> </div> <div class="panel-body"><blockquote>'+ tweets[i].text +'</h3> </div> </div>'
+			        }
+                    contents+='</div>';
+                    contents2+='<div>'
+			        for(i = 0; i < secondset.length; i++){
+			        	contents2+= '<div class="panel '+ sentimentcolor(secondset[i].sentiment) +'"> <div class="panel-heading"> <h3 class="panel-title">'+ secondset[i].user +'</h3> </div> <div class="panel-body"><blockquote>'+ secondset[i].text +'</h3> </div> </div>'
+			        }
+                    contents2+='</div>';
+			        container.html(contents);
+			        container2.html(contents2);
+			        $('#query').val(querystring);
+			        $('#2query').val(querystrings);
+			        $('#loading').html(data['count'] + " Tweets  about "+ querystring +"."+" "+(data['secondcount'] + " Tweets about "+ querystrings +"."));
+			    }
+			});
+		}
+
+		function get_csv(json){
+			var fields = Object.keys(json[0]);
+			var csv = json.map(function(row){
+			  return fields.map(function(fieldName){
+			    return JSON.stringify(row[fieldName] || '');
+			  });
+			});
+			csv.unshift(fields);
+			return csv.join('\r\n');
+		}
+
+		function csvdownload(filename, text) {
+		  var element = document.createElement('a');
+		  element.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(text));
+		  element.setAttribute('download', filename);
+		  element.style.display = 'none';
+		  document.body.appendChild(element);
+		  element.click();
+		  document.body.removeChild(element);
+		}
+
+		$('#search').click(function(){
+			$('#loading').html('Loading...');
+			$('#tweets').html('');
+			$('#tweets2').html('');
+			load_tweets($('#query').val(),$('#2query').val());
+		});
+
+		$('#csv').click(function(){
+			csvdownload('topicone.csv', get_csv(dataone));
+			csvdownload('topictwo.csv', get_csv(datatwo));
+		});
+     $(document).ready(function(){
+			load_tweets('Pfizer','Moderna');
+
+		});
+
+	function buildChart(data) {
+	    var current_data = data['data'];
+    var Android = getAndroidPercentage(data,current_data);
+	var Iphone = IphonePercentage(data,current_data);
+	var Other = OtherPercentage(data,current_data);
+	var newcurrent_data = data['sdata'];
+	var Android2 = getAndroidPercentage(data,newcurrent_data);
+	var Iphone2 = IphonePercentage(data,newcurrent_data);
+	var Other2 = OtherPercentage(data,newcurrent_data);
+
+	var Androidneutral = NeutralPercentage(data,"Android",current_data);
+	var Androidpostive = PositivePercentage(data,"Android",current_data);
+	var Androidnegative = NegativePercentage(data,"Android",current_data);
+
+	var Androidneutral2 = NeutralPercentage(data,"Android",newcurrent_data);
+	var Androidpostive2 = PositivePercentage(data,"Android",newcurrent_data);
+	var Androidnegative2 = NegativePercentage(data,"Android",newcurrent_data)
+
+	var iPhoneneutral = NeutralPercentage(data,"iPhone",current_data);
+	var iPhonepostive = PositivePercentage(data,"iPhone",current_data);
+	var iPhonenegative =NegativePercentage(data,"iPhone",current_data);
+
+	var iPhoneneutral2 = NeutralPercentage(data,"iPhone",newcurrent_data);
+	var iPhonepostive2 = PositivePercentage(data,"iPhone",newcurrent_data);
+	var iPhonenegative2 = NegativePercentage(data,"iPhone",newcurrent_data);
+
+	var Otherneutral = NeutralPercentage(data,"Other",current_data);
+	var Otherpostive = PositivePercentage(data,"Other",current_data);
+	var Othernegative = NegativePercentage(data,"Other",current_data);
+
+	var Otherneutral2 = NeutralPercentage(data,"Other",newcurrent_data);
+	var Otherpostive2 = PositivePercentage(data,"Other",newcurrent_data);
+	var Othernegative2 = NegativePercentage(data,"Other",newcurrent_data);
+	var topicone = data['query']
+        var topictwo = data['Secondqury']
+
+    Highcharts.chart('container', {
+            chart: {
+                type: 'column'
+            },
+            title: {
+                text: 'Breakdown of devices for Tweets'
+            },
+            accessibility: {
+        announceNewData: {
+            enabled: true
+        }
+    },
+            xAxis: {
+                type: 'category'
+            },
+            yAxis: {
+                title: {
+                    text: 'Tweets'
+                }
+            },
+            legend: {
+                enabled: false
+            },
+            plotOptions: {
+                series: {
+                    borderWidth: 0,
+                    dataLabels: {
+                        enabled: true
+                    }
+                }
+            },
+           plotOptions: {
+        series: {
+            dataLabels: {
+                enabled: true,
+                inside: true
+            }
+        }
+    },
+        tooltip: {
+        headerFormat: '<span style="font-size:11px">{series.name}</span><br>',
+        pointFormat: '<span style="color:{point.color}">{point.name}</span>: <b>{point.y}</b> Tweets<br/>'
+    },
+            series: [{
+                dataLabels: [{
+            align: 'center',
+            format: '({point.age})'
+        }, {
+            align: 'right',
+            format: '{y} points'
+        }],
+                name: "Phones",
+            colorByPoint: true,
+                data: [{
+                    name: 'Android',
+                    y: Android,
+                    drilldown: 'Android',
+                    age: topicone
+
+                }, {
+                    name: 'Iphone',
+                    y: Iphone,
+                    drilldown: 'Iphone',
+                    age: topicone
+
+                }, {
+                    name: 'Other',
+                    y:Other,
+                    drilldown: 'Other',
+                    age: topicone
+                },
+                {
+                    name: 'Android2',
+                    y: Android2,
+                    drilldown: 'Android2',
+                    age: topictwo
+
+                }, {
+                    name: 'Iphone2',
+                    y: Iphone2,
+                    drilldown: 'Iphone2',
+                    age: topictwo
+
+                }, {
+                    name: 'Other2',
+                    y:Other2,
+                    drilldown: 'Other2',
+                    age: topictwo
+                }]
+            }]
+        ,drilldown:{
+                series: [
+                    {
+                        name: 'Android',
+                        id: 'Android',
+                        data: [[
+                            'Android postive Sentiment',
+                            Androidpostive
+                        ],
+                        [
+                            'Android neutral Sentiment',
+                            Androidneutral
+                        ],
+                        [
+                            'Android negative Sentiment',
+                            Androidnegative
+                        ]
+                        ]
+                    },
+                    {
+                        name: 'Iphone',
+                        id: 'Iphone',
+                        data: [[
+                            'Iphone postive Sentiment',
+                            iPhonepostive
+                        ],
+                        [
+                            'Iphone neutral Sentiment',
+                            iPhoneneutral
+                        ],
+                        [
+                            'Iphone negative Sentiment',
+                            iPhonenegative
+                        ]
+                        ]
+                    },
+                    {
+                        name: 'Other',
+                        id: 'Other',
+                        data: [[
+                            'Other postive Sentiment',
+                            Otherpostive
+                        ],
+                        [
+                            'Other neutral Sentiment',
+                            Otherneutral
+                        ],
+                        [
+                            'Other negative Sentiment',
+                            Othernegative
+                        ]
+                        ]
+                    },
+                    {
+                        name: 'Android2',
+                        id: 'Android2',
+                        data: [[
+                            'Android postive Sentiment',
+                            Androidpostive2
+                        ],
+                        [
+                            'Android neutral Sentiment',
+                            Androidneutral2
+                        ],
+                        [
+                            'Android negative Sentiment',
+                            Androidnegative2
+                        ]
+                        ]
+                    },
+                    {
+                        name: 'Iphone2',
+                        id: 'Iphone2',
+                        data: [[
+                            'Iphone postive Sentiment',
+                            iPhonepostive2
+                        ],
+                        [
+                            'Iphone neutral Sentiment',
+                            iPhoneneutral2
+                        ],
+                        [
+                            'Iphone negative Sentiment',
+                            iPhonenegative2
+                        ]
+                        ]
+                    },
+                    {
+                        name: 'Other2',
+                        id: 'Other2',
+                        data: [[
+                            'Other postive Sentiment',
+                            Otherpostive2
+                        ],
+                        [
+                            'Other neutral Sentiment',
+                            Otherneutral2
+                        ],
+                        [
+                            'Other negative Sentiment',
+                            Othernegative2
+                        ]
+                        ]
+                    }
+                  ]
+            }
+        })
+};
+function NegativePercentage(data,value,current_data) {
+	var counter = 0 ;
+	for (var i = current_data.length - 1; i >= 0; i--) {
+	    if(current_data[i].phone == value)
+            if(current_data[i].sentiment == 'negative')
+                counter ++;
+	}
+	return counter;
+}
+function PositivePercentage(data,value,current_data) {
+	var counter = 0 ;
+	for (var i = current_data.length - 1; i >= 0; i--) {
+	 if(current_data[i].phone == value)
+		if(current_data[i].sentiment == 'positive')
+			counter ++;
+	}
+	return counter;
+}
+function NeutralPercentage(data,value,current_data) {
+
+	var counter = 0 ;
+	for (var i = current_data.length - 1; i >= 0; i--) {
+	    if(current_data[i].phone == value)
+            if(current_data[i].sentiment == 'neutral')
+                counter ++;
+	}
+	return counter;
+
+}
+function getAndroidPercentage(data,current_data) {
+	var counter = 0 ;
+	for (var i = current_data.length - 1; i >= 0; i--) {
+		if(current_data[i].phone == 'Android')
+			counter ++;
+	}
+	return counter;
+}
+function IphonePercentage(data,current_data) {
+	var counter = 0 ;
+	for (var i = current_data.length - 1; i >= 0; i--) {
+		if(current_data[i].phone == 'iPhone')
+			counter ++;
+	}
+	return counter;
+}
+function OtherPercentage(data,current_data) {
+	var counter = 0 ;
+	for (var i = current_data.length - 1; i >= 0; i--) {
+		if(current_data[i].phone == 'Other')
+			counter ++;
+	}
+	return counter;
+}
+	</script>
+</body>
+</html>
+
